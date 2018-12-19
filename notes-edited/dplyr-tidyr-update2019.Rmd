@@ -1,0 +1,575 @@
+---
+title: "dplyr-tidyr lesson"
+author: "Stephanie Labou, Reid Otsuji"
+date: "12/19/2018"
+output: html_document
+---
+
+# Data manipulation and tidy data
+
+Material adapted from: 
+* https://swcarpentry.github.io/r-novice-gapminder/14-tidyr/index.html
+* https://swcarpentry.github.io/r-novice-gapminder/13-dplyr/index.html
+* https://datacarpentry.org/R-ecology-lesson/03-dplyr.html
+
+
+## Download and read in data
+
+#### Data downloaded from XXXXX (talk to Reid about putting the csv files on the class github site)
+
+First, we need to download the data we'll be working with today.
+
+Go to URL: https://raw.githubusercontent.com/swcarpentry/r-novice-gapminder/gh-pages/_episodes_rmd/data/gapminder_data.csv
+Right click, select "Save As", then navigate to the same folder as your R script is in. Save the file.
+
+Next, we need to read in the data. Assuming your csv files are in the same folder as this R script, we can also use tab autocomplete to help us find the files we want. 
+
+We'll call the gapminder_data file "gapminder".
+```{r}
+gapminder <- read.csv("../data/gapminder_data.csv")
+```
+
+## Explore data
+
+First, let's take a quick look at this data to become familiar with how it's formatted and what we're looking at here.
+
+#### str(), head(), tail(), summary()
+
+We can check out the structure of the gapminder data using str()
+```{r}
+str(gapminder)
+```
+Looks like we've got 1704 rows and 6 columns. Columns are country, year, population, continent, life expectancy, and GDP per capita. We have a mix of character and number columns.
+
+Let's take a look at the first few rows using head()
+```{r}
+head(gapminder)
+```
+
+And see summary stats with summary()
+```{r}
+summary(gapminder)
+```
+
+
+## Packages
+
+For this lesson, we'll be working with two packages: dplyr and tidyr
+
+Let's install these packages using the console. The syntax is install.packages("package")
+```{r}
+#install.packages("dplyr")
+#install.packages("tidyr")
+```
+
+Remember, to access the functions within a package, we need to load the library at the start of our session. Otherwise, R doesn't know where the function we're referring to comes from, and it won't find it. The best way to handle loading packages/libraries, is to load all your libraries at the top of your script.
+```{r}
+library(dplyr)
+library(tidyr)
+```
+
+Now we're ready to get started!
+
+## Manipulating data with dplyr
+
+We're going to start with dplyr, a package for manipulating tabular data (data frames). Manipulation of dataframes means many things to many researchers. Most often, we want to select certain observations (rows) or variables (columns):
+
+* observations = rows
+* variables = columns
+
+There are a lot of functions in the dplyr package, but today we're going to talk about the 5 most commonly used ones:
+
+* select()
+* filter()
+* mutate()
+* group_by()
+* summarize()
+
+### the select() function
+
+We'll start with select(), which is used to select columns. The syntax is: select(data, col1, col2,...) 
+
+So let's say I want to make a new subset dataframe that just has country, year, and population:
+```{r}
+year_country_pop <- select(gapminder, country, year, pop)
+head(year_country_pop)
+```
+
+Let's take a closer look at what we did here:
+
+![dplyr select](fig/13-dplyr-fig1.png)
+
+#### Exercise
+Make a new dataframe called "year_continent_pop" that has only the columns country, life expectancy, and gdp per capita.
+
+```{r}
+country_life_gdp <- select(gapminder, country, lifeExp, gdpPercap)
+
+head(country_life_gdp)
+```
+
+### the filter() function
+
+We can use the filter() command to subset rows, rather than columns. 
+
+For instance, let's say we want a dataframe only where life expectancy is at least 50.
+
+```{r}
+over_50 <- filter(gapminder, lifeExp >= 50)
+
+summary(over_50)
+```
+
+We can use any sort of comparison operators: 
+* < (less than)
+* <= (less than or equal to)
+* > (greater than)
+* >= (greater than or equal to)
+* == (equal to)
+* != (not equal to)
+
+We can also chain these together using:
+* & (and)
+* | (or)
+
+For example, if we want a dataframe with life expectancy of at least 50 and continent equal to Asia, we would use:
+```{r}
+over_50_Asia <- filter(gapminder, lifeExp >= 50 & continent == "Asia")
+
+summary(over_50_Asia)
+```
+
+### the pipe 
+
+The select() and filter() command are useful, but at this point not substantially easier yet than bracket subsetting. The strength of dplyr is in using a pipe ( %>% ) to chain together commands. (Shortcut for pipe on Windows is Ctrl+Shift+m)
+
+I can do the same type of subsetting, but with the syntax where I start with the data frame, then pipe in commands.
+
+Recall the example above where we wanted only the columns country, year, and population. With the pipe, the syntax would look like this.
+```{r}
+year_country_pop2 <- gapminder %>% 
+  select(country, year, pop)
+
+head(year_country_pop2)
+```
+
+The resulting dataframes are identifical, whichever approach I use.
+```{r}
+identical(year_country_pop, year_country_pop2)
+```
+
+The pipe is most useful when chaining together multiple subsetting commands.
+ 
+For instance, let's say once I have only those columns of interest, I only want rows for countries in Europe. 
+```{r}
+year_country_gdp_euro <- gapminder %>% 
+  select(country, year, gdpPercap) %>% 
+  filter(continent == "Europe")
+
+str(year_country_gdp_euro)
+```
+
+What happened here?
+
+The pipe is like a funnel: once we selected our columns, those are the only columns available to use, so we weren't able to filter based on a condition in a column we no longer have.
+
+We can work around this by re-ordering our commands, like so:
+```{r}
+year_country_gdp_euro <- gapminder %>% 
+    filter(continent == "Europe") %>% 
+    select(country, year, gdpPercap)
+
+str(year_country_gdp_euro)
+```
+
+
+The newline and automatic indent isn't strictly necessary, but it's really useful for readability when building together these kinds of commands.
+
+Let's unpack what's going on here: I'm starting with the full gapminder data, selecting the columns country, year, and GDP, then keeping only the rows where country is equal to Europe. Think of the pipe of chaining together commands like a funnel: the full data goes through command 1, then the remainder goes through command 2, and so on. You're funneling your data to keep only what you want, based on the criteria you specify.
+
+#### Exercise 
+Create a new dataframe, called "gap_new", that has life expectancy, country, and year, for all African countries. (Hint: use continent again). How many rows and columns does this dataframe have?
+
+```{r}
+gap_new <- gapminder %>% 
+   filter(continent == "Africa") %>% 
+   select(lifeExp, country, year) 
+
+dim(gap_new)
+```
+
+So now we can get the subset of rows and columns we're interested in, and we know how to chain together commands using the pipe.
+
+### the mutate() function
+
+Next, let's talk about mutate(), which is used to create new columns. This is really useful for units conversions or columns that are derivatives of other columns.
+
+For instance, let's say I wanted total GDP, not GDP per capita.
+
+```{r}
+gap_GDP <- gapminder %>% 
+  mutate(gdp = gdpPercap * pop)
+  
+head(gap_GDP)
+```
+
+Now I have a new column, GDP, added to my dataframe.
+
+* **Exercise**
+Create a new dataframe that has a new column with the ratio of life expectancy to GDP per capita. Keep only the country and ratio column. Hint: think about the order of operations!
+```{r}
+gap_ratio <- gapminder %>% 
+  mutate(lifeexp_gdppercap_ratio = lifeExp/gdpPercap) %>% 
+  select(country, lifeexp_gdppercap_ratio)
+
+dim(gap_ratio)
+head(gap_ratio)
+```
+
+### conditionals
+
+Ok, now we know how to create a new column, but let's take that up a step - let's combine it with a conditional statement. For example, maybe we want to create a new column indicating whether life expectancy is over some threshold - maybe we're going to use these categories in a model, or for a plot. We can do this by combining ifelse() with mutate().
+
+First, let's talk about ifelse() - if this a conditional to say IF condition is met, do X, and if not, then do Y. For example, if life expectancy is greater than fifty, do something, and if not, do another time.
+
+Let's put this into practice. We'll create a new column called "half_century" and we're interested in countries and year where the life expectancy is at least 50.
+```{r}
+gap_life_50 <- gapminder %>% 
+  #create a new column based on this condition
+  #syntax is ifelse(condition, yes outcome, no outcome)
+  mutate(half_century = ifelse(lifeExp >= 50, "longer life", "shorter life"))
+
+head(gap_life_50)
+```
+
+#### Exercise
+Let's try a challenge question! Create a new dataframe called "gap_new2" that has two new columns: one new column called "GDP" with total GDP (remember GDP = gdp per capita * population) and another new column called "big_spender" that has "yes" if GDP is greater than 10 billion (10,000,000,000) and "no" if the GDP is less than 10 billion.
+
+```{r}
+gap_new2 <- gapminder %>% 
+  mutate(GDP = gdpPercap * pop,
+         big_spender = ifelse(GDP > 10000000000, "yes", "not"))
+
+head(gap_new2)
+```
+
+
+<!-- #### missing values (NA) -->
+<!-- Now that we know how to use mutate() and filter(), let's talk about everyone's favorite topic: missing values. -->
+
+<!-- This particular dataset doesn't have any missing values, but most data includes at least some missing values. Missing values in R are coded as NA values. This isn't NA in quotes - it's not a character strings, it's its own category.  -->
+
+<!-- Let's take a quick look at a dataset that's got multiple kinds of missing values. [[Open and talk through na-test.csv]] We have an actual NA, which is good, but we also have a -9999, an empty cell, a period, and a NULL. -->
+
+<!-- Let's read this into R and see what happens. -->
+
+<!-- ```{r} -->
+<!-- missing <- read.csv("na-test.csv") -->
+<!-- missing -->
+<!-- ``` -->
+
+<!-- The syntax for working with NA values in R is is.na(). -->
+<!-- ```{r} -->
+<!-- #keep only rows with missing values for continent -->
+<!-- missing %>%  -->
+<!--   filter(is.na(Continent)) -->
+<!-- ``` -->
+
+<!-- If we want non-NA values, we can use ! to indicate the inverse. -->
+<!-- ```{r} -->
+<!-- no_missing <- missing %>%  -->
+<!--   filter(!is.na(Continent)) -->
+
+<!-- no_missing -->
+<!-- ``` -->
+
+<!-- Note there that before, the NA value we had was accurately identified as an NA value. But, if we try to find all the non-NA rows, we retain all these other options for NA. -->
+
+<!-- What we want to do is replace these variable NA values with the one proper NA value of NA. -->
+
+<!-- ~ To recap, we know how to use select() to subset by columns, filter() to subset rows, and mutate() to create new columns. We also covered conditional statements with ifelse() and how to deal with missing values. ~ -->
+
+#### group_by() and summarize()
+Next up, let's talk about group_by() and summarize(). group_by() groups your data and summarize() returns summary statistics, such as min, max, mean, etc.
+
+When we use group_by(), whatever commands we use after it will be applied to each group. 
+
+![gapminder-group](http://swcarpentry.github.io/r-novice-gapminder/fig/13-dplyr-fig2.png)
+
+For instance, if I want to group by continent I would use
+```{r}
+continent_summary <- gapminder %>% 
+  group_by(continent)
+
+str(continent_summary)
+```
+
+Notice that the structure has changed - this is now a "grouped_df". Of course, if we look at the first few rows, it looks the same still:
+```{r}
+head(continent_summary)
+```
+
+It's not until we combine group_by() with a new function, summarize(), that we really see how group_by() works.
+
+For instance, if I want to group by continent and return the mean GDP, I would use
+```{r}
+continent_summary <- gapminder %>% 
+  group_by(continent) %>% 
+  summarize(mean_gdpPercap = mean(gdpPercap))
+
+continent_summary
+```
+I can use any sort of function within summarize. The common ones you'll probably use are max(), min(), mean(), and median().
+
+![gap-summarize-image](http://swcarpentry.github.io/r-novice-gapminder/fig/13-dplyr-fig3.png)
+
+
+Note that I could do the same thing with mutate().
+```{r}
+continent_summary2 <- gapminder %>% 
+  group_by(continent) %>% 
+  mutate(mean_gdpPercap = mean(gdpPercap))
+
+head(continent_summary2) 
+```
+
+The differrence is in what's returned: with mutate, you've added a new column with this information and everything is returned. With summarize, you're only returning the groups and whatever you've calculated. Think of it like returning the unique combinations of each country and calculated value.
+
+```{r}
+continent_summary3 <- gapminder %>% 
+  group_by(continent) %>% 
+  mutate(mean_gdpPercap = mean(gdpPercap)) %>%
+  select(continent, mean_gdpPercap) %>% 
+  unique()
+
+head(continent_summary3)
+#same result as summarize() above
+```
+
+#### Exercise 
+Find maximum life expectancy for each country.
+```{r}
+max_lifeexp <- gapminder %>% 
+  group_by(country) %>% 
+  summarize(max_life = max(lifeExp))
+
+head(max_lifeexp)
+```
+The result is arranged alphabetically, like the input data, but that's not super helpful.
+
+I can sort my output using arrange(). The default is smallest to largest, so I'll add desc to clarify that I want to have the largest values at the top of the output. I can add this to my code above, or just take a peek by using %>% and head()
+
+```{r}
+max_lifeexp %>% 
+  arrange(desc(max_life)) %>% 
+  head()
+```
+
+<!-- * **Exercise** -->
+<!-- Let's bring all these commands together! This is something you'll come across a lot when you're organizing your data for input into some sort of analysis or plot. -->
+
+<!-- Scenario 1: Start from the original gapminder data. You need a new dataframe that includes countries from Oceania, Asia, and Africa, between 1980-2000, with columns country, year, and life expectancy:GPD per capita ratio. Hint: build this step by step with each step on a new line, connected by a pipe operator.  -->
+
+<!-- ```{r} -->
+<!-- gap_new <- gapminder %>%  -->
+<!--   # %in% new concept - go over -->
+<!--   filter(continent %in% c("Oceania", "Asia", "Africa")) %>%  -->
+<!--   filter(year >= 1980 & year <= 2000) %>%  -->
+<!--   mutate(life_gdp_capita = lifeExp/gdpPercap) %>%  -->
+<!--   select(country, year, life_gdp_capita) -->
+
+<!-- head(gap_new) -->
+
+<!-- ``` -->
+
+<!-- Question 1: What's the life/GDP per capita ratio in Thailand in 1992? -->
+<!-- ```{r} -->
+<!-- gap_new %>%  -->
+<!--   filter(country == "Thailand" &  year == 1992) -->
+<!-- ``` -->
+
+<!-- Scenario 2: Using the dataframe you just created, you want to find country-level average life/GDP per capita ratio. The output should be organized so that the minimum ratio is in the first row. -->
+<!-- ```{r} -->
+<!-- gap_new2 <- gap_new %>%  -->
+<!--   group_by(country) %>%  -->
+<!--   summarize(mean_life_gdpPercap_ratio = mean(life_gdp_capita)) %>%  -->
+<!--   arrange(mean_life_gdpPercap_ratio) -->
+
+<!-- head(gap_new2) -->
+<!-- ``` -->
+
+<!-- Question 1: What's the country with the second highest mean life/GDP per capita ratio? -->
+<!-- ```{r} -->
+<!-- gap_new2 %>%  -->
+<!--   tail(n=2) -->
+<!-- ``` -->
+
+### Full recap 
+
+* select() is for selecting columns
+* filter() is for subsetting rows by specified criteria
+* mutate() is for creating new columns
+* group_by() is for grouping data by category
+* summarize() is for returning summary statistics
+* arrange() is for ordering data frame by some column
+
+
+## Overview of tidy data
+
+Researchers often want to manipulate their data from the `wide` to `long` format, or vise versa.  
+
+The long format is where:
+* each column is a variable 
+* each row is an observation 
+
+In the long format, you have 1 column for the `observed variable` and the other columns are `ID variables`
+
+for the `wide` format:
+* each row is often a `site/subject/or patient` and you have multiple observation variables containing the same type of data 
+* these can be either `repeated observations over time`, or observations of multiple variables` (or a mix of both)
+
+* you may find data input may be simpler or some other applications may prefer the `wide` format. 
+
+* many of R functions have been designed assuming you have `long` format data.
+
+![widevlong - image](http://swcarpentry.github.io/r-novice-gapminder/fig/14-tidyr-fig1.png)
+
+* for humans, the wide format is often more intuitive sicne we can often see more of the data on the screen due to its shape. 
+
+* however, the long format is more machine readable and is closer to formatting of databases 
+
+
+In an ideal situation, we want our data to be "tidy". What this means is we want all our variables - things measured - in columns, and each observation in a row. This gives us a familiar tabular dataset with rows and columns.
+
+The gapminder data we've been working with looks pretty tidy so far
+```{r}
+head(gapminder)
+```
+
+But what if our data didn't arrive in this format? What if we had to do some work to get it in this tidy structure?
+
+#### read in wide data
+
+Let's read in another version of the gapminder data, the one we downloaded earlier called "gapminder_wide.csv"
+```{r}
+#this time, we want to set stringsAsFactors = FALSE
+gap_wide <- read.csv("../data/gapminder_wide.csv", stringsAsFactors = FALSE)
+
+head(gap_wide)
+```
+
+This is a different foramt - we have a continent and country column, but GDP per capita, population, and life expectancy are across the top, one column for each year. This isn't an uncommon format - think of if there were merged cells for each category (GDP, pop, life exp) and then columns within those categories for each year. Or vice versa.
+
+This is called a "wide" format - each row is a location and columns are multiple observations containing the same type of data (yearly values for 3 variables). This may be useful in certain situations, but often we want a "long" format, with one column for ID, one column for variable, and one column for result. For the gapminder data, that would be if we had *one* column called, say, variable, with GDP per capita, population, and life expectancy, and a "value" column with values for each. This isn't a great format for a lot of analyses, but this is often the format we'll want when we're plotting data in R and want to, say, assign colors based on variables.
+
+The gapminder data we've been working with so far is in an intermediate format between long and wide, which is often a really  useful format.  So, we should know how to convert dataframes from long to wide, and vice versa, as well as how to get to this intermediate format. That's where the package tidyr comes in.
+
+## Working with tidyr
+
+tidyr is a package for reformating/reshaping data frames from long to wide and vice versa. We loaded the tidyr package when we started this session, using library(tidyr), so now the tidyr functions are availble to work with during this R session.
+
+We want to get this wide gapminder data into the nice intermediate format we've been working with. The first things we'll do is convert from wide to long format, when partially widen our dataframe again.
+
+### using gather()
+
+First, we'll use the tidyr function gather() to "gather" all observation variables into a single variable. I'm going to write out the syntax, and then we're going to unpack it.
+```{r}
+#start with gapminder data in long format
+gap_long <- gap_wide %>% #use pipe (we have previously loaded dplyr)
+  #key is name of new "variable" column we're creating
+  #value is name of new value columns we're creating
+  gather(key = "type_year", value = "obvs_values", 
+         #including all coumns we want to include in this reshape
+         #we're NOT including continent and country - those are our ID values)
+         #we could type them all out, or use bracket subsetting, but that's tedious
+         #instead, we'll use a -, meaning we want everything EXCEPT these particular columns
+         c(-continent, -country))
+
+head(gap_long)
+```
+
+Now we have a long format with our ID variables (continent and country), our "variable" column, and our "values" column.We've got a more long format data frame!
+
+Let's dig a little deeper into what happened here: 
+![longformat](http://swcarpentry.github.io/r-novice-gapminder/fig/14-tidyr-fig3.png)
+
+But, our variable column "type_year" has two pieces of information: the variable we collected and the year (i.e., GDP per capita for 1952). We can use the separate() function to split the character strings in this column into multiple columns.
+```{r}
+gap_long_split <- gap_long %>%
+  #syntax is separate(column, into = c(col1, col2,...), sep = "separating character")
+  #underscores make a great separating character, which is what we have here
+  separate(type_year, into = c("type", "year"), sep = "_")
+
+head(gap_long_split)
+str(gap_long_split)
+```
+
+```{r}
+#year is a character - we want it to be an integer
+gap_long_split <- gap_long_split %>% 
+  mutate(year = as.integer(year))
+
+str(gap_long_split)
+```
+
+#### Exercise 
+
+We've done a bit of working getting the data into this format, so let's see why this structure might be useful for analysis. Using gap_long_split, calculate the mean life expectancy, population, and gdpPercap for each continent. Hint: use the group_by() and summarize() functions we learned in the dplyr lesson.
+```{r}
+gap_long_split %>% 
+  group_by(continent, type) %>% 
+  summarize(mean = mean(obvs_values))
+```
+
+### working with spread()
+
+Now we're going to go from this long format to the nice intermediate format we started with. To do this, we'll use the function spread(), which will spread our data out wide. We could also use spread() to from our fully long data to the fully wide format we started with.
+
+The syntax is similar to gather(): spread(data, key, value, fill = NA). ~The default "fill" value if anything is missing is NA, but you could specify.~
+
+So let's say we want to have our types as columns - one column fo gdpPercap, pop, and lifeExp
+```{r}
+gap_re_wide <- gap_long_split %>% 
+  #key is what you want your new columns to be
+  #value is what you want to fill those columns in with (what values)
+  spread(key = type, value = obvs_values)
+  #all other columns stay where they are
+
+head(gap_re_wide)
+```
+
+<!-- #### Exercise  -->
+<!-- 1) Using gap_re_wide, make this data long again, so you have columns continent, country, year, type, and value.  -->
+<!-- 2) Then filter this data to keep only gdpPercap values.  -->
+<!-- 3) Then make the data wide(r) so you have columns continent, country, year, and gdpPercap. -->
+<!-- 4) Remove column continent. -->
+
+<!-- ```{r} -->
+<!-- new_gap <- gap_re_wide %>%  -->
+<!--   gather(key = "type", value = "value", c(-continent, -country, -year)) -->
+
+<!-- head(new_gap) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- new_gap <- new_gap %>%  -->
+<!--   filter(type == "gdpPercap") -->
+
+<!-- head(new_gap) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- new_gap <- new_gap %>%  -->
+<!--   spread(key = type, value = value) -->
+
+<!-- head(new_gap) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- new_gap <- new_gap %>%  -->
+<!--   select(-continent) -->
+
+<!-- head(new_gap) -->
+<!-- ``` -->
+
+
